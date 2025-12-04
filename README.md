@@ -49,13 +49,13 @@ CareerKey aims to bridge the gap between **education** and **employment** by off
 ## 📸 UI Screenshots
 
 ### 🏠 Landing Page
-![Landing Page](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/landingPage.png)  
+![Landing Page](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/landingPage.png)
 The **Landing Page** serves as the welcome screen for CareerKey. It provides an overview of the platform, highlights key features, and allows users to navigate to login or information sections. This page sets the first impression with a **modern, responsive UI** built with React.js and Tailwind CSS.
 
 ---
 
 ### 🕵️‍♂️ Verifier Portal
-![Verifier Portal](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/verifierPortal.png)  
+![Verifier Portal](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/verifierPortal.png)
 The **Verifier Portal** is designed for authorized personnel to verify degrees and documents.  
 - Quick search by CNIC or student information  
 - Access blockchain-verified attestation data  
@@ -64,7 +64,7 @@ The **Verifier Portal** is designed for authorized personnel to verify degrees a
 ---
 
 ### 🔐 Login Page
-![Login Page](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/loginPage.png)  
+![Login Page](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/loginPage.png)
 The **Login Page** allows three types of users to access the system:  
 1. **Student** – Can submit degrees and view career recommendations  
 2. **University** – Accessed via HEC authorization for student verification  
@@ -75,7 +75,7 @@ The **Login Page** allows three types of users to access the system:
 ---
 
 ### 🏛️ HEC Portal
-![HEC Portal](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/hecPortal.png)  
+![HEC Portal](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/hecPortal.png)
 The **HEC Portal** dashboard allows administrative tasks including:  
 - University management and approvals  
 - Degree verification oversight  
@@ -85,7 +85,7 @@ The **HEC Portal** dashboard allows administrative tasks including:
 ---
 
 ### 🎓 University Portal
-![University Portal](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/uniPortal.png)  
+![University Portal](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/uniPortal.png)
 The **University Portal** provides:  
 - Student record management  
 - Verification request handling  
@@ -95,7 +95,7 @@ The **University Portal** provides:
 ---
 
 ### 👨‍🎓 Student Portal
-![Student Portal](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/StudentPortal (1).png)  
+![Student Portal](https://raw.githubusercontent.com/Shahiskhan/CareerKey-Frontend/main/src/assets/screeshots/StudentPortal (1).png)
 The **Student Portal** is the main interface for students to:  
 - Submit degrees for blockchain verification  
 - Track the status of attestation requests  
