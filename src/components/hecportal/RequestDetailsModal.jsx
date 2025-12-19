@@ -50,9 +50,9 @@ const RequestDetailsModal = ({ request, onClose, onApprove, onReject }) => {
                                 <div className="bg-white border border-emerald-100 p-4 rounded-2xl shadow-sm">
                                     <div className="flex items-center gap-3 mb-2">
                                         <span className={`px-4 py-2 rounded-xl text-sm font-bold shadow-sm ${request.status === "Verified" ? "bg-green-100 text-green-700" :
-                                                request.status === "Pending HEC" ? "bg-amber-100 text-amber-700" :
-                                                    request.status === "Rejected by HEC" ? "bg-red-100 text-red-700" :
-                                                        "bg-blue-100 text-blue-700"
+                                            request.status === "Pending HEC" ? "bg-amber-100 text-amber-700" :
+                                                request.status === "Rejected by HEC" ? "bg-red-100 text-red-700" :
+                                                    "bg-blue-100 text-blue-700"
                                             }`}>
                                             {request.status}
                                         </span>
@@ -103,33 +103,60 @@ const RequestDetailsModal = ({ request, onClose, onApprove, onReject }) => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Blockchain Workflow & Action Buttons (Moved here to show only on scroll) */}
+                    <div className="mt-12 pt-8 border-t border-emerald-100 flex flex-col gap-6">
+                        <div className="text-center">
+                            <h4 className="text-xs font-bold text-emerald-800 uppercase tracking-[0.2em] mb-4">Complete Blockchain Verification Workflow</h4>
+
+                            <div className="flex flex-wrap items-center justify-center gap-3">
+                                <button className="flex-1 min-w-[150px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group">
+                                    <span className="text-xl group-hover:rotate-12 transition-transform">🏷️</span>
+                                    STAMP DOCUMENT
+                                </button>
+                                <button className="flex-1 min-w-[150px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group">
+                                    <span className="text-xl group-hover:rotate-12 transition-transform">☁️</span>
+                                    UPLOAD TO IPFS
+                                </button>
+                                <button className="flex-1 min-w-[150px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group">
+                                    <span className="text-xl group-hover:rotate-12 transition-transform">📄</span>
+                                    SMART CONTRACT
+                                </button>
+                                <button className="flex-1 min-w-[200px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group">
+                                    <span className="text-xl group-hover:rotate-12 transition-transform">⛓️</span>
+                                    IPFS HASH TRANSACTION
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-center items-center gap-4 py-6 mt-4">
+                            {request.status === "Pending HEC" ? (
+                                <>
+                                    <button
+                                        onClick={() => { onReject(request.id); onClose(); }}
+                                        className="px-10 py-3 rounded-xl text-sm font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition border-2 border-rose-200"
+                                    >
+                                        Reject Request
+                                    </button>
+                                    <button
+                                        onClick={() => { onApprove(request.id); onClose(); }}
+                                        className="px-16 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 shadow-xl shadow-emerald-200 transition-all hover:scale-105 active:scale-95"
+                                    >
+                                        Approve & Verify Permanently
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={onClose}
+                                    className="px-12 py-3 rounded-xl text-sm font-bold bg-gray-800 text-white hover:bg-black transition-all"
+                                >
+                                    Close Details
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
-                {/* Footer Actions */}
-                <div className="px-8 py-6 bg-gray-50 border-t flex justify-end gap-3 shrink-0">
-                    <button
-                        onClick={onClose}
-                        className="px-6 py-2.5 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-200 transition"
-                    >
-                        Close
-                    </button>
-                    {request.status === "Pending HEC" && (
-                        <>
-                            <button
-                                onClick={() => { onReject(request.id); onClose(); }}
-                                className="px-6 py-2.5 rounded-xl text-sm font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
-                            >
-                                Reject Request
-                            </button>
-                            <button
-                                onClick={() => { onApprove(request.id); onClose(); }}
-                                className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition"
-                            >
-                                Approve & Verify
-                            </button>
-                        </>
-                    )}
-                </div>
             </div>
         </div>
     );
