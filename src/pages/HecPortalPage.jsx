@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import Navbar from "../components/hecportal/Navbar";
 import Sidebar from "../components/hecportal/Sidebar";
 import Dashboard from "../components/hecportal/Dashboard";
-import PendingRequests from "../components/hecportal/PendingRequests";
+import RequestStatus from "../components/hecportal/RequestStatus";
 import VerifiedRequests from "../components/hecportal/VerifiedRequests";
 import AuditLogs from "../components/hecportal/AuditLogs";
 import ChartsOverview from "../components/hecportal/ChartsOverview";
@@ -27,7 +27,7 @@ const HecPortalPage = () => {
                 <div className="flex-1 overflow-auto flex flex-col relative">
                     <main className="flex-1 p-8">
                         {activeTab === "dashboard" && <Dashboard />}
-                        {activeTab === "pending" && <PendingRequests />}
+                        {activeTab === "pending" && <RequestStatus />}
                         {activeTab === "verified" && <VerifiedRequests />}
                         {activeTab === "logs" && <AuditLogs />}
                         {activeTab === "charts" && <ChartsOverview />}

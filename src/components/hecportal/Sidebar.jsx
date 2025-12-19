@@ -2,7 +2,7 @@ import React from "react";
 
 const menus = [
     { id: "dashboard", icon: "🏠", label: "Dashboard" },
-    { id: "pending", icon: "🕒", label: "Pending Requests" },
+    { id: "pending", icon: "🕒", label: "Request Status" },
     { id: "verified", icon: "✅", label: "Verified Requests" },
     { id: "logs", icon: "🗒️", label: "Audit Logs" },
     { id: "charts", icon: "📊", label: "Analytics" },
