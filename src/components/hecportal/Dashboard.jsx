@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
 import StatCard from "./StatCard";
 import ChartsOverview from "./ChartsOverview";
+import { hecService } from "../../services/hecService";
+import { useAuth } from "../../contexts/AuthContext";
 
 const Dashboard = () => {
+    const { user } = useAuth();
     const [stats, setStats] = useState([
         { icon: "🕒", label: "Pending Requests", value: 0, type: "pending" },
         { icon: "✅", label: "Verified", value: 0, type: "verified" },
@@ -10,36 +13,53 @@ const Dashboard = () => {
         { icon: "❌", label: "Rejected", value: 0, type: "rejected" },
     ]);
     const [recent, setRecent] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const requests = JSON.parse(localStorage.getItem("attestationRequests") || "[]");
+        const fetchHecDashboard = async () => {
+            if (!user?.id) return;
 
-        const pending = requests.filter(r => r.status === "Pending HEC").length;
-        const verified = requests.filter(r => r.status === "Verified").length;
-        const rejected = requests.filter(r => r.status === "Rejected by HEC").length;
+            try {
+                setIsLoading(true);
+                const data = await hecService.getHecDashboard(user.id);
 
-        setStats([
-            { icon: "🕒", label: "Pending Requests", value: pending, type: "pending" },
-            { icon: "✅", label: "Verified", value: verified, type: "verified" },
-            { icon: "⛓️", label: "Blockchain Attested", value: verified, type: "blockchain" },
-            { icon: "❌", label: "Rejected", value: rejected, type: "rejected" },
-        ]);
+                // Fallback to local storage for requests if backend only returns basic stats
+                const requests = JSON.parse(localStorage.getItem("attestationRequests") || "[]");
 
-        // Filter activities relevant to HEC (Pending HEC, Verified, Rejected by HEC)
-        const hecRelated = requests.filter(r =>
-            r.status === "Pending HEC" || r.status === "Verified" || r.status === "Rejected by HEC"
-        );
+                const pending = data.pendingRequests ?? requests.filter(r => r.status === "Pending HEC").length;
+                const verified = data.verifiedRequests ?? requests.filter(r => r.status === "Verified").length;
+                const rejected = data.rejectedRequests ?? requests.filter(r => r.status === "Rejected by HEC").length;
 
-        const recentActivities = [...hecRelated]
-            .sort((a, b) => b.id - a.id)
-            .slice(0, 5)
-            .map(req => ({
-                action: `Request from ${req.name}: ${req.status}`,
-                time: req.date
-            }));
+                setStats([
+                    { icon: "🕒", label: "Pending Requests", value: pending, type: "pending" },
+                    { icon: "✅", label: "Verified", value: verified, type: "verified" },
+                    { icon: "⛓️", label: "Blockchain Attested", value: verified, type: "blockchain" },
+                    { icon: "❌", label: "Rejected", value: rejected, type: "rejected" },
+                ]);
 
-        setRecent(recentActivities);
-    }, []);
+                // Filter activities relevant to HEC
+                const hecRelated = requests.filter(r =>
+                    r.status === "Pending HEC" || r.status === "Verified" || r.status === "Rejected by HEC"
+                );
+
+                const recentActivities = [...hecRelated]
+                    .sort((a, b) => b.id - a.id)
+                    .slice(0, 5)
+                    .map(req => ({
+                        action: `Request from ${req.name}: ${req.status}`,
+                        time: req.date
+                    }));
+
+                setRecent(recentActivities);
+            } catch (error) {
+                console.error("HEC Dashboard fetch error:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchHecDashboard();
+    }, [user]);
 
     return (
         <section>

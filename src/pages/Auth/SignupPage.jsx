@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AuthCard from "../../components/auth/AuthCard";
 import InputField from "../../components/common/InputField";
 import PrimaryButton from "../../components/common/PrimaryButton";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import Navbar from "../../components/Navbar";
+import { universityService } from "../../services/universityService";
 
 const SignupPage = () => {
     const [formData, setFormData] = useState({
@@ -16,14 +17,50 @@ const SignupPage = () => {
         gender: "MALE",
         contactNumber: "",
         address: "",
-        universityName: ""
+        universityName: "",
+        universityId: "",
+        rollNumber: ""
     });
+    const [universities, setUniversities] = useState([]);
     const [error, setError] = useState("");
     const { registerStudent, isLoading } = useAuth();
     const navigate = useNavigate();
 
+    useEffect(() => {
+        const fetchUniversities = async () => {
+            try {
+                const response = await universityService.getAllUniversities();
+                if (response.success && Array.isArray(response.data)) {
+                    setUniversities(response.data);
+                } else if (Array.isArray(response)) {
+                    setUniversities(response);
+                } else if (response.content && Array.isArray(response.content)) {
+                    setUniversities(response.content);
+                } else {
+                    console.warn("Unexpected universities response structure:", response);
+                    setUniversities([]);
+                }
+            } catch (err) {
+                console.error("Failed to load universities", err);
+            }
+        };
+        fetchUniversities();
+    }, []);
+
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+        setError("");
+    };
+
+    const handleUniversityChange = (e) => {
+        const selectedId = e.target.value;
+        const selectedUniv = universities.find(u => u.id === selectedId);
+
+        setFormData({
+            ...formData,
+            universityId: selectedId,
+            universityName: selectedUniv ? (selectedUniv.name || selectedUniv.universityName) : ""
+        });
         setError("");
     };
 
@@ -115,14 +152,34 @@ const SignupPage = () => {
                                 placeholder="03XX-XXXXXXX"
                                 required
                             />
+
+                            <div className="flex flex-col gap-1">
+                                <label className="text-sm font-medium text-gray-700">University</label>
+                                <select
+                                    name="universityId"
+                                    value={formData.universityId}
+                                    onChange={handleUniversityChange}
+                                    required
+                                    className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                                >
+                                    <option value="">Select University</option>
+                                    {universities.map(univ => (
+                                        <option key={univ.id} value={univ.id}>
+                                            {univ.name || univ.universityName}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <InputField
-                                label="University Name"
-                                name="universityName"
-                                value={formData.universityName}
+                                label="Roll Number / Student ID"
+                                name="rollNumber"
+                                value={formData.rollNumber}
                                 onChange={handleChange}
-                                placeholder="Current University"
+                                placeholder="e.g. F20-BSCS-001"
                                 required
                             />
+
                             <div className="md:col-span-2">
                                 <InputField
                                     label="Address"
@@ -157,4 +214,3 @@ const SignupPage = () => {
 };
 
 export default SignupPage;
-

@@ -29,11 +29,19 @@ const Navbar = () => {
     };
 
     const getPortalLink = () => {
+        // Debugging logs
+        console.log("Navbar User:", user);
+        console.log("Navbar Roles:", user?.roles);
+
         if (!user || !user.roles) return "/login";
         const roles = user.roles;
+
+        // Check for specific roles
         if (roles.includes('ROLE_HEC') || roles.includes('HEC')) return "/hec-portal";
         if (roles.includes('ROLE_UNIVERSITY') || roles.includes('UNIVERSITY')) return "/university-portal";
         if (roles.includes('ROLE_STUDENT') || roles.includes('STUDENT')) return "/student-portal";
+
+        console.warn("No matching role found, defaulting to login.");
         return "/login";
     };
 
@@ -94,7 +102,7 @@ const Navbar = () => {
                             to="/login"
                             className="ml-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 text-white text-sm font-bold shadow-md hover:shadow-lg hover:from-emerald-700 hover:to-green-700 transition-all duration-300 hover:scale-105 transform"
                         >
-                            PORTALS
+                            LOGIN / PORTALS
                         </Link>
                     )}
                 </div>
@@ -195,7 +203,7 @@ const Navbar = () => {
                             className="block px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 text-white text-sm font-bold shadow-md text-center hover:from-emerald-700 hover:to-green-700 transition-all duration-300"
                             onClick={closeMobileMenu}
                         >
-                            🚀 PORTALS
+                            🚀 LOGIN / PORTALS
                         </Link>
                     )}
                 </div>

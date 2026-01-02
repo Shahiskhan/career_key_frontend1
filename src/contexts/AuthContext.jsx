@@ -11,33 +11,32 @@ export const AuthProvider = ({ children }) => {
     const normalizeUser = (userData) => {
         if (!userData) return null;
 
-        // Backend uses 'role' (singular) as per record UserDto { Set<Role> role }
-        const rawRoles = userData.role || userData.roles || [];
+        console.log("Raw user data from backend:", userData);
 
+        // Standardize roles
+        const rawRoles = userData.role || userData.roles || userData.authorities || [];
         const roles = (Array.isArray(rawRoles) ? rawRoles : [rawRoles]).map(r => {
             let roleName = "";
             if (typeof r === 'string') {
                 roleName = r;
             } else if (r && typeof r === 'object') {
-                // Handle complex role objects common in Spring Security
                 roleName = r.name || r.authority || r.roleName || "";
             }
-
-            // Standardize to ROLE_ prefix if missing (matches ProtectedRoute requirements)
             if (roleName && !roleName.startsWith('ROLE_')) {
                 return `ROLE_${roleName.toUpperCase()}`;
             }
             return roleName.toUpperCase();
         }).filter(Boolean);
 
-        return {
+        const normalized = {
             ...userData,
             roles,
-            enabled: userData.enable ?? userData.enabled // Map 'enable' from backend record
+            enabled: userData.enabled ?? userData.enable ?? true
         };
+
+        console.log("Normalized user:", normalized);
+        return normalized;
     };
-
-
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -54,7 +53,6 @@ export const AuthProvider = ({ children }) => {
             }
             setIsLoading(false);
         };
-
         checkAuth();
     }, []);
 
@@ -62,17 +60,25 @@ export const AuthProvider = ({ children }) => {
         setIsLoading(true);
         try {
             const data = await authService.login(credentials);
-            const userToSet = normalizeUser(data.user || data);
+            let userData = data.user || data;
+
+            // Fetch profile if roles are missing
+            if (!userData.role && !userData.roles) {
+                try {
+                    userData = await authService.getCurrentUser();
+                } catch (fetchError) {
+                    console.warn("Could not fetch user profile after login", fetchError);
+                }
+            }
+
+            const userToSet = normalizeUser(userData);
             setUser(userToSet);
             setIsAuthenticated(true);
             return { ...data, user: userToSet };
-        } catch (error) {
-            throw error;
         } finally {
             setIsLoading(false);
         }
     };
-
 
     const logout = async () => {
         try {
@@ -83,13 +89,8 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const registerStudent = async (data) => {
-        return await authService.registerStudent(data);
-    };
-
-    const registerUniversity = async (data) => {
-        return await authService.registerUniversity(data);
-    };
+    const registerStudent = async (data) => authService.registerStudent(data);
+    const registerUniversity = async (data) => authService.registerUniversity(data);
 
     const value = {
         user,
@@ -106,8 +107,6 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
+    if (!context) throw new Error('useAuth must be used within an AuthProvider');
     return context;
 };

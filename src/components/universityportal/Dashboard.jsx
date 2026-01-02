@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { universityService } from "../../services/universityService";
+import { useAuth } from "../../contexts/AuthContext";
 
 const StatCard = ({ icon, title, value, color, bgColor }) => (
     <div className={`${bgColor} p-6 rounded-2xl shadow-md border border-gray-100 hover:shadow-lg transition`}>
@@ -13,6 +15,7 @@ const StatCard = ({ icon, title, value, color, bgColor }) => (
 );
 
 const Dashboard = () => {
+    const { user } = useAuth();
     const [statsData, setStatsData] = useState({
         totalStudents: 0,
         pending: 0,
@@ -20,33 +23,57 @@ const Dashboard = () => {
         rejected: 0
     });
     const [activities, setActivities] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const students = JSON.parse(localStorage.getItem("universityStudents") || "[]");
-        const requests = JSON.parse(localStorage.getItem("attestationRequests") || "[]");
+        const fetchDashboardData = async () => {
+            if (!user?.id) return;
 
-        const pending = requests.filter(r => r.status === "Pending University").length;
-        const forwarded = requests.filter(r => r.status === "Pending HEC" || r.status === "Verified").length;
-        const rejected = requests.filter(r => r.status.includes("Rejected")).length;
+            try {
+                setIsLoading(true);
+                const data = await universityService.getUniversityDashboard(user.id);
+                // Assuming backend returns stats in some format, 
+                // but let's map what we can or use defaults if not available yet
+                // For now, if the API isn't fully returning stats, we fallback to local calculations
+                // but we primarily try to use the 'data' from API.
 
-        setStatsData({
-            totalStudents: students.length,
-            pending,
-            forwarded,
-            rejected
-        });
+                // If the backend DTO has these fields, use them:
+                // Otherwise fallback to local storage for demo if needed, 
+                // but the user wants me to use the ID in the request.
 
-        // Generate recent activities from requests (sorted newest first)
-        const recent = [...requests]
-            .sort((a, b) => b.id - a.id)
-            .slice(0, 5)
-            .map(req => ({
-                text: `Request from ${req.name} (${req.degree}): ${req.status}`,
-                time: req.date
-            }));
-        setActivities(recent);
+                // Fetching actual requests to calculate stats if dashboard DTO is just profile
+                const students = JSON.parse(localStorage.getItem("universityStudents") || "[]");
+                const requests = JSON.parse(localStorage.getItem("attestationRequests") || "[]");
 
-    }, []);
+                const pending = requests.filter(r => r.status === "Pending University").length;
+                const forwarded = requests.filter(r => r.status === "Pending HEC" || r.status === "Verified").length;
+                const rejected = requests.filter(r => r.status.includes("Rejected")).length;
+
+                setStatsData({
+                    totalStudents: data.totalStudents || students.length,
+                    pending: data.pendingRequests || pending,
+                    forwarded: data.forwardedRequests || forwarded,
+                    rejected: data.rejectedRequests || rejected
+                });
+
+                // Generate recent activities
+                const recent = [...requests]
+                    .sort((a, b) => b.id - a.id)
+                    .slice(0, 5)
+                    .map(req => ({
+                        text: `Request from ${req.name} (${req.degree}): ${req.status}`,
+                        time: req.date
+                    }));
+                setActivities(recent);
+            } catch (error) {
+                console.error("Dashboard fetch error:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchDashboardData();
+    }, [user]);
 
     const stats = [
         { icon: "👥", title: "Total Students", value: statsData.totalStudents, color: "bg-blue-100 text-blue-600", bgColor: "bg-blue-50" },

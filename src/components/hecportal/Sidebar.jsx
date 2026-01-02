@@ -1,4 +1,6 @@
 import React from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const menus = [
     { id: "dashboard", icon: "🏠", label: "Dashboard" },
@@ -9,34 +11,53 @@ const menus = [
     { id: "register", icon: "🏫", label: "Register University" },
 ];
 
-const Sidebar = ({ activeTab, setActiveTab }) => (
-    <aside className="w-72 h-screen bg-gradient-to-b from-emerald-900 to-green-800 text-white shadow-2xl sticky top-0 flex flex-col">
-        <div className="flex items-center gap-3 p-8 pb-2">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center font-bold text-xl">
-                HEC
+const Sidebar = ({ activeTab, setActiveTab }) => {
+    const { logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+        await logout();
+        navigate('/');
+    };
+
+    return (
+        <aside className="w-72 h-screen bg-gradient-to-b from-emerald-900 to-green-800 text-white shadow-2xl sticky top-0 flex flex-col">
+            <div className="flex items-center gap-3 p-8 pb-2">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center font-bold text-xl">
+                    HEC
+                </div>
+                <div>
+                    <span className="font-semibold text-xl tracking-tight">CareerKey</span>
+                    <p className="text-xs text-emerald-300">HEC Portal</p>
+                </div>
             </div>
-            <div>
-                <span className="font-semibold text-xl tracking-tight">CareerKey</span>
-                <p className="text-xs text-emerald-300">HEC Portal</p>
-            </div>
-        </div>
-        <nav className="px-4 py-6 space-y-2 flex-1">
-            {menus.map(menu => (
+            <nav className="px-4 py-6 space-y-2 flex-1">
+                {menus.map(menu => (
+                    <button
+                        key={menu.id}
+                        onClick={() => setActiveTab(menu.id)}
+                        className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl transition ${activeTab === menu.id ? "bg-white text-emerald-900 font-bold shadow-xl scale-105" : "text-emerald-100 hover:bg-emerald-700 hover:shadow"
+                            }`}
+                    >
+                        <span className="text-2xl">{menu.icon}</span>
+                        <span className="text-lg">{menu.label}</span>
+                    </button>
+                ))}
+            </nav>
+            <div className="p-4 border-t border-emerald-700">
                 <button
-                    key={menu.id}
-                    onClick={() => setActiveTab(menu.id)}
-                    className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl transition ${activeTab === menu.id ? "bg-white text-emerald-900 font-bold shadow-xl scale-105" : "text-emerald-100 hover:bg-emerald-700 hover:shadow"
-                        }`}
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-5 py-3 rounded-xl text-red-200 hover:bg-red-500/20 transition-all font-bold shadow-sm"
                 >
-                    <span className="text-2xl">{menu.icon}</span>
-                    <span className="text-lg">{menu.label}</span>
+                    <span className="text-2xl">🚪</span>
+                    <span className="text-lg">Logout</span>
                 </button>
-            ))}
-        </nav>
-        <div className="text-xs text-emerald-300 p-6 mt-auto">
-            &copy; 2025 CareerKey Blockchain Verified
-        </div>
-    </aside>
-);
+            </div>
+            <div className="text-xs text-emerald-300 px-8 py-4">
+                &copy; 2025 CareerKey Blockchain Verified
+            </div>
+        </aside>
+    );
+};
 
 export default Sidebar;

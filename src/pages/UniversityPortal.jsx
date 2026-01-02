@@ -8,6 +8,7 @@ import DegreeIssuance from "../components/universityportal/DegreeIssuance";
 import Verification from "../components/universityportal/Verification";
 import Reports from "../components/universityportal/Reports";
 import Settings from "../components/universityportal/Settings";
+import DegreeRequestsView from "../components/universityportal/DegreeRequestsView";
 
 const UniversityPortal = () => {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -17,6 +18,7 @@ const UniversityPortal = () => {
             case "dashboard": return <Dashboard />;
             case "students": return <Students />;
             case "attestations": return <Attestations />;
+            case "degree-requests": return <DegreeRequestsView />;
             case "degree-issuance": return <DegreeIssuance />;
             case "verification": return <Verification />;
             case "reports": return <Reports />;

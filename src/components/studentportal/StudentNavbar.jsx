@@ -1,14 +1,15 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/images/logo.png";
+import { useAuth } from "../../contexts/AuthContext";
 
 const StudentNavbar = ({ activeSection, onNavigate }) => {
     const navigate = useNavigate();
+    const { logout } = useAuth();
 
-    const handleLogout = () => {
-        // Clear session if needed
-        // localStorage.removeItem("studentName"); 
-        navigate('/login');
+    const handleLogout = async () => {
+        await logout();
+        navigate('/');
     };
 
     return (
@@ -28,10 +29,10 @@ const StudentNavbar = ({ activeSection, onNavigate }) => {
                     Dashboard
                 </button>
                 <button
-                    onClick={() => onNavigate('attestation')}
-                    className={`text-sm font-semibold transition-colors ${activeSection === 'attestation' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}
+                    onClick={() => onNavigate('degree-request')}
+                    className={`text-sm font-semibold transition-colors ${activeSection === 'degree-request' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}
                 >
-                    Request Attestation
+                    Degree Request
                 </button>
                 <button
                     onClick={() => onNavigate('jobs')}
