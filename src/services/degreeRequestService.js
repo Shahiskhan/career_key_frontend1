@@ -60,6 +60,21 @@ const degreeRequestService = {
         const response = await api.post(`/degree-requests/${degreeRequestId}/reject/university/${universityId}`, { remarks });
         return response.data;
     },
+
+    verifyByHec: async (degreeRequestId) => {
+        const response = await api.post(`/degree-requests/${degreeRequestId}/verify/hec`);
+        return response.data;
+    },
+
+    stampDegreeRequest: async (degreeRequestId) => {
+        const response = await api.post(`/hec/attestation/degree-requests/${degreeRequestId}/stamp`);
+        return response.data;
+    },
+
+    uploadToIpfs: async (degreeRequestId) => {
+        const response = await api.post(`/hec/attestation/upload/${degreeRequestId}`);
+        return response.data;
+    },
 };
 
 export default degreeRequestService;
