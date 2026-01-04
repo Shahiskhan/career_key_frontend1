@@ -1,29 +1,45 @@
 import React, { useState, useEffect } from "react";
 import degreeRequestService from "../../services/degreeRequestService";
 import { FiLoader, FiCheckCircle, FiSearch, FiExternalLink } from "react-icons/fi";
+import RequestDetailsModal from "./RequestDetailsModal";
 
 const VerifiedRequests = () => {
     const [verifiedRequests, setVerifiedRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedRequest, setSelectedRequest] = useState(null);
+
+    const fetchVerified = async () => {
+        setLoading(true);
+        try {
+            const response = await degreeRequestService.getRequestsByStatus("VERIFIED_BY_HEC");
+            const content = response.data?.content || response.content || [];
+            setVerifiedRequests(content);
+
+            // SYNC MODAL
+            if (selectedRequest) {
+                const updatedItem = content.find(r => r.id === selectedRequest.id);
+                if (updatedItem) {
+                    setSelectedRequest(updatedItem);
+                }
+            }
+        } catch (err) {
+            console.error("Error fetching verified requests:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchVerified = async () => {
-            setLoading(true);
-            try {
-                // Fetch requests verified by HEC
-                const response = await degreeRequestService.getRequestsByStatus("VERIFIED_BY_HEC");
-                const content = response.data?.content || response.content || [];
-                setVerifiedRequests(content);
-            } catch (err) {
-                console.error("Error fetching verified requests:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchVerified();
     }, []);
+
+    const handleUpdateRequest = (updatedRequest) => {
+        setVerifiedRequests(prev => prev.map(req => req.id === updatedRequest.id ? { ...req, ...updatedRequest } : req));
+        if (selectedRequest && selectedRequest.id === updatedRequest.id) {
+            setSelectedRequest(prev => ({ ...prev, ...updatedRequest }));
+        }
+    };
 
     const filteredRequests = verifiedRequests.filter(req =>
         req.studentName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -70,7 +86,7 @@ const VerifiedRequests = () => {
                                     <th className="px-6 py-5 text-left text-xs font-bold text-emerald-900 uppercase tracking-widest">University</th>
                                     <th className="px-6 py-5 text-left text-xs font-bold text-emerald-900 uppercase tracking-widest">Program</th>
                                     <th className="px-6 py-5 text-left text-xs font-bold text-emerald-900 uppercase tracking-widest">Verification</th>
-                                    <th className="px-6 py-5 text-center text-xs font-bold text-emerald-900 uppercase tracking-widest">Status</th>
+                                    <th className="px-6 py-5 text-center text-xs font-bold text-emerald-900 uppercase tracking-widest">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-emerald-50/50">
@@ -84,16 +100,24 @@ const VerifiedRequests = () => {
                                         <td className="px-6 py-4 text-sm text-gray-600 font-medium">{req.program}</td>
                                         <td className="px-6 py-4">
                                             <div className="text-xs text-gray-500 mb-1">{new Date(req.requestDate).toLocaleDateString()}</div>
-                                            <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold">
-                                                <span>{req.txHash ? req.txHash.substring(0, 16) + '...' : 'BLOCKCHAIN_ID_00' + req.id.substring(0, 4)}</span>
-                                                <FiExternalLink className="w-2.5 h-2.5" />
+                                            <div className="flex flex-col gap-1">
+                                                <span className={`text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded border fill-current w-fit ${req.documentStatus === 'BLOCKCHAIN_ANCHORED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                    }`}>
+                                                    {req.documentStatus?.replace(/_/g, ' ') || 'VERIFIED'}
+                                                </span>
+                                                <div className="flex items-center gap-1 text-[9px] text-gray-400 font-mono">
+                                                    <span>{req.txHash ? req.txHash.substring(0, 16) + '...' : 'PENDING_ANCHOR'}</span>
+                                                    {req.txHash && <FiExternalLink className="w-2 h-2" />}
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-full uppercase tracking-widest">
-                                                <FiCheckCircle className="w-3 h-3" />
-                                                Verified
-                                            </span>
+                                            <button
+                                                onClick={() => setSelectedRequest(req)}
+                                                className="px-4 py-2 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                                            >
+                                                View Document
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -102,8 +126,20 @@ const VerifiedRequests = () => {
                     </div>
                 )}
             </div>
+
+            {/* Request Details Modal */}
+            {selectedRequest && (
+                <RequestDetailsModal
+                    request={selectedRequest}
+                    onClose={() => setSelectedRequest(null)}
+                    onUpdate={handleUpdateRequest}
+                    onRefresh={fetchVerified}
+                    onApprove={() => { }}
+                    onReject={() => { }}
+                />
+            )}
         </div>
     );
-};
+}
 
 export default VerifiedRequests;

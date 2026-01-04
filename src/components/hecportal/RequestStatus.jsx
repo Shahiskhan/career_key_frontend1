@@ -41,16 +41,13 @@ const RequestStatus = () => {
             const uniObj = universities.find(u => u.name === selectedUniversity);
 
             if (selectedUniversity !== "All" && uniObj) {
-                // Fetch by University (optionally with status if backend supports it)
                 if (activeFilter === "All") {
                     response = await degreeRequestService.getRequestsByUniversity(uniObj.id);
                 } else {
                     response = await degreeRequestService.getRequestsByUniversityAndStatus(uniObj.id, activeFilter);
                 }
             } else {
-                // Fetch by Status for all universities
                 if (activeFilter === "All") {
-                    // For now default to VERIFIED_BY_UNIVERSITY if 'All' is selected for all universities
                     response = await degreeRequestService.getRequestsByStatus("VERIFIED_BY_UNIVERSITY");
                 } else {
                     response = await degreeRequestService.getRequestsByStatus(activeFilter);
@@ -59,6 +56,14 @@ const RequestStatus = () => {
 
             let content = response.data?.content || response.content || [];
             setAllRequests(content);
+
+            // SYNC MODAL: Agar koi request select hui hai to usey bhi refresh data se update karein
+            if (selectedRequest) {
+                const updatedItem = content.find(r => r.id === selectedRequest.id);
+                if (updatedItem) {
+                    setSelectedRequest(updatedItem);
+                }
+            }
         } catch (err) {
             console.error("Error fetching requests:", err);
             setError("Failed to load degree requests.");
@@ -83,6 +88,13 @@ const RequestStatus = () => {
             alert(err.response?.data?.message || "Failed to verify request.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleUpdateRequest = (updatedRequest) => {
+        setAllRequests(prev => prev.map(req => req.id === updatedRequest.id ? { ...req, ...updatedRequest } : req));
+        if (selectedRequest && selectedRequest.id === updatedRequest.id) {
+            setSelectedRequest(prev => ({ ...prev, ...updatedRequest }));
         }
     };
 
@@ -213,14 +225,20 @@ const RequestStatus = () => {
                                             {new Date(req.requestDate).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${req.status === 'VERIFIED_BY_HEC' || req.status === 'COMPLETED' ? "bg-green-100 text-green-700" :
-                                                        req.status === 'VERIFIED_BY_UNIVERSITY' ? "bg-blue-100 text-blue-700" :
-                                                            req.status === 'PENDING' ? "bg-amber-100 text-amber-700" :
-                                                                "bg-red-100 text-red-700"
+                                            <div className="flex flex-col gap-2">
+                                                <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm w-fit ${req.status === 'VERIFIED_BY_HEC' || req.status === 'COMPLETED' ? "bg-green-100 text-green-700" :
+                                                    req.status === 'VERIFIED_BY_UNIVERSITY' ? "bg-blue-100 text-blue-700" :
+                                                        req.status === 'PENDING' ? "bg-amber-100 text-amber-700" :
+                                                            "bg-red-100 text-red-700"
                                                     }`}>
                                                     {req.status}
                                                 </span>
+                                                {req.documentStatus && (
+                                                    <span className="text-[9px] font-bold text-emerald-600/60 uppercase tracking-tighter flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                                        Doc: {req.documentStatus.replace(/_/g, ' ')}
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -267,6 +285,8 @@ const RequestStatus = () => {
                     onClose={() => setSelectedRequest(null)}
                     onApprove={handleApprove}
                     onReject={handleReject}
+                    onUpdate={handleUpdateRequest}
+                    onRefresh={fetchRequests}
                 />
             )}
         </div>

@@ -75,6 +75,16 @@ const degreeRequestService = {
         const response = await api.post(`/hec/attestation/upload/${degreeRequestId}`);
         return response.data;
     },
+
+    qrStampDegreeRequest: async (degreeRequestId) => {
+        const response = await api.post(`/hec/attestation/degree-requests/${degreeRequestId}/qr-stamp`);
+        return response.data;
+    },
+
+    storeResultOnBlockchain: async (degreeRequestId) => {
+        const response = await api.post(`/hec/attestation/degree-requests/${degreeRequestId}/store-result`);
+        return response.data;
+    },
 };
 
 export default degreeRequestService;

@@ -1,35 +1,103 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import degreeRequestService from "../../services/degreeRequestService";
 import degreeImage from "../../assets/images/buy-college-degree-from-the-riphah-international-university.jpg";
 import { FiLoader, FiCheckCircle, FiClock, FiShield } from "react-icons/fi";
 
-const RequestDetailsModal = ({ request, onClose, onApprove, onReject }) => {
+const RequestDetailsModal = ({ request, onClose, onApprove, onReject, onUpdate, onRefresh }) => {
     const [isStamping, setIsStamping] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
-    const [isStamped, setIsStamped] = useState(request.stampedByHec || false);
+    const [isQrStamping, setIsQrStamping] = useState(false);
+    const [isAnchoring, setIsAnchoring] = useState(false);
+
+    // Safety check: normalized status from backend
+    const initialStatus = request.documentStatus || (request.stampedByHec ? 'HEC_STAMPED' : 'PENDING');
+    const [documentStatus, setDocumentStatus] = useState(initialStatus);
+
     const [ipfsHash, setIpfsHash] = useState(request.ipfsHash || null);
+    const [ipfsProvider, setIpfsProvider] = useState(request.ipfsProvider || "https://ipfs.io/ipfs/");
     const [currentDocumentBase64, setCurrentDocumentBase64] = useState(request.documentBase64 || null);
-    const [currentDocumentType, setCurrentDocumentType] = useState('application/pdf'); // Default to PDF for degrees
+    const [previewUrl, setPreviewUrl] = useState(null);
+
+    // Effect to handle base64 to Blob URL conversion
+    useEffect(() => {
+        if (currentDocumentBase64) {
+            try {
+                const byteCharacters = atob(currentDocumentBase64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+
+                setPreviewUrl(url);
+
+                // Cleanup function to revoke URL
+                return () => URL.revokeObjectURL(url);
+            } catch (err) {
+                console.error("Error creating preview URL:", err);
+            }
+        } else {
+            setPreviewUrl(null);
+        }
+    }, [currentDocumentBase64]);
+
+    // SYNC with parent data updates
+    useEffect(() => {
+        if (request.documentStatus) setDocumentStatus(request.documentStatus);
+        if (request.stampedByHec !== undefined) {
+            // We can still use this info to update status if needed, 
+            // but initialStatus already handles it.
+        }
+        if (request.ipfsHash) setIpfsHash(request.ipfsHash);
+        if (request.ipfsProvider) setIpfsProvider(request.ipfsProvider);
+        if (request.documentBase64) setCurrentDocumentBase64(request.documentBase64);
+    }, [request]);
+
+    const handleStoreResult = async () => {
+        setIsAnchoring(true);
+        try {
+            const response = await degreeRequestService.storeResultOnBlockchain(request.id);
+            if (response.success && response.data) {
+                const txData = response.data;
+                const newStatus = 'BLOCKCHAIN_ANCHORED';
+
+                setDocumentStatus(newStatus);
+
+                // Notify parent about the update
+                if (onUpdate) {
+                    onUpdate({
+                        ...request,
+                        blockchainTransaction: {
+                            transactionHash: txData.transactionHash,
+                            status: txData.status,
+                            blockNumber: txData.blockNumber
+                        },
+                        documentStatus: newStatus
+                    });
+                }
+
+                if (onRefresh) onRefresh();
+                alert(`SUCCESS: Result anchored to Blockchain!\nTx Hash: ${txData.transactionHash}`);
+            } else {
+                throw new Error(response.message || "Failed to anchor to blockchain");
+            }
+        } catch (err) {
+            console.error("Blockchain anchoring failed:", err);
+            alert("Blockchain Error: " + (err.message || "Unknown error"));
+        } finally {
+            setIsAnchoring(false);
+        }
+    };
 
     if (!request) return null;
 
-    const documentSource = currentDocumentBase64
-        ? `data:image/jpeg;base64,${currentDocumentBase64}`
-        : degreeImage;
-
     const handleOpenFull = () => {
-        if (currentDocumentBase64) {
-            const byteCharacters = atob(currentDocumentBase64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'application/pdf' });
-            const fileURL = URL.createObjectURL(blob);
-            window.open(fileURL, '_blank');
-        } else {
-            window.open(documentSource, '_blank');
+        if (previewUrl) {
+            window.open(previewUrl, '_blank');
+        } else if (!currentDocumentBase64) {
+            window.open(degreeImage, '_blank');
         }
     };
 
@@ -39,28 +107,27 @@ const RequestDetailsModal = ({ request, onClose, onApprove, onReject }) => {
             const response = await degreeRequestService.stampDegreeRequest(request.id);
             if (response.success && response.data) {
                 const stampedData = response.data;
+                const newStatus = stampedData.documentStatus || 'HEC_STAMPED';
+
+                // Update local state with stamped base64
                 setCurrentDocumentBase64(stampedData.base64);
-                setIsStamped(true);
+                setDocumentStatus(newStatus);
 
-                // Show success message
-                alert("Digital QR Stamp applied successfully. Document updated with official HEC seal.");
-
-                // Also trigger download for convenience (optional, user might want to see it first)
-                const byteCharacters = atob(stampedData.base64);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                // Notify parent about the update to ensure persistence in the UI
+                if (onUpdate) {
+                    onUpdate({
+                        ...request,
+                        documentBase64: stampedData.base64,
+                        stampedByHec: true,
+                        documentStatus: newStatus
+                    });
                 }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'application/pdf' });
-                const url = window.URL.createObjectURL(blob);
 
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute('download', `stamped_degree_${request.studentName.replace(/\s+/g, '_')}.pdf`);
-                document.body.appendChild(link);
-                link.click();
-                link.parentNode.removeChild(link);
+                // We no longer trigger download here as per user request
+                // The document will be updated in the preview iframe automatically
+                if (onRefresh) onRefresh(); // Trigger parent reload FIRST
+                // Show success message
+                alert("Digital QR Stamp applied successfully.");
             } else {
                 throw new Error(response.message || "Failed to stamp document");
             }
@@ -76,8 +143,22 @@ const RequestDetailsModal = ({ request, onClose, onApprove, onReject }) => {
         setIsUploading(true);
         try {
             const response = await degreeRequestService.uploadToIpfs(request.id);
-            setIpfsHash(response.ipfsHash);
-            alert(`Document uploaded to IPFS decentralized storage!\n\nHash: ${response.ipfsHash}`);
+            // The response is now the full DegreeRequestDto
+            const newIpfsHash = response.ipfsHash;
+            const newIpfsProvider = response.ipfsProvider || "https://ipfs.io/ipfs/";
+            const newStatus = response.documentStatus || 'IPFS_UPLOADED';
+
+            setIpfsHash(newIpfsHash);
+            setIpfsProvider(newIpfsProvider);
+            setDocumentStatus(newStatus);
+
+            // Notify parent about the full update
+            if (onUpdate) {
+                onUpdate(response);
+            }
+
+            if (onRefresh) onRefresh(); // Trigger parent reload FIRST
+            alert(`Document uploaded to IPFS!\n\nHash: ${newIpfsHash}`);
         } catch (err) {
             console.error("IPFS upload failed:", err);
             alert("IPFS storage failed. " + (err.response?.data || err.message));
@@ -85,6 +166,53 @@ const RequestDetailsModal = ({ request, onClose, onApprove, onReject }) => {
             setIsUploading(false);
         }
     };
+
+    const handleQrStamp = async () => {
+        setIsQrStamping(true);
+        try {
+            const response = await degreeRequestService.qrStampDegreeRequest(request.id);
+            if (response.success && response.data) {
+                const stampedData = response.data;
+                const newStatus = 'QR_GENERATED';
+
+                // Update local state with QR-stamped base64
+                setCurrentDocumentBase64(stampedData.base64);
+                setDocumentStatus(newStatus);
+
+                // Notify parent about the update
+                if (onUpdate) {
+                    onUpdate({
+                        ...request,
+                        documentBase64: stampedData.base64,
+                        documentStatus: newStatus
+                    });
+                }
+
+                if (onRefresh) onRefresh();
+                alert("Verification QR Code embedded into PDF successfully.");
+            } else {
+                throw new Error(response.message || "Failed to apply QR stamp");
+            }
+        } catch (err) {
+            console.error("QR Stamping failed:", err);
+            alert("QR Stamp failed: " + (err.message || "Unknown error"));
+        } finally {
+            setIsQrStamping(false);
+        }
+    };
+
+    const getStatusOrder = (status) => {
+        const orders = {
+            'PENDING': 0,
+            'HEC_STAMPED': 1,
+            'IPFS_UPLOADED': 2,
+            'QR_GENERATED': 3,
+            'BLOCKCHAIN_ANCHORED': 4
+        };
+        return orders[status] || 0;
+    };
+
+    const currentStatusOrder = getStatusOrder(documentStatus);
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -112,6 +240,73 @@ const RequestDetailsModal = ({ request, onClose, onApprove, onReject }) => {
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto p-8">
+                    {ipfsHash && (documentStatus === 'IPFS_UPLOADED' || documentStatus === 'QR_GENERATED' || documentStatus === 'BLOCKCHAIN_ANCHORED') && (
+                        <div className="mb-8 animate-in slide-in-from-top-4 duration-500">
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-100 rounded-[1.5rem] p-5 flex flex-wrap items-center justify-between gap-4 shadow-xl shadow-blue-500/5 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <FiShield size={80} className="text-blue-900" />
+                                </div>
+                                <div className="flex items-center gap-5 relative z-10 w-full md:w-auto">
+                                    <div className="h-14 w-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-xl shadow-blue-200 rotate-3">
+                                        <FiCheckCircle size={28} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="text-blue-950 font-black text-lg tracking-tight">Decentralized Storage Verified</h4>
+                                        <p className="text-blue-700/80 text-sm font-medium">Document permanently anchored to IPFS Network</p>
+                                        <div className="mt-1 flex items-center gap-2">
+                                            <span className="text-[10px] font-mono bg-blue-100/50 text-blue-800 px-2 py-0.5 rounded-md">HASH: {ipfsHash.substring(0, 24)}...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 relative z-10 w-full sm:w-auto">
+                                    <a
+                                        href={`${ipfsProvider}${ipfsHash}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-1 sm:flex-none bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-2"
+                                    >
+                                        VIEW ON IPFS ↗
+                                    </a>
+                                </div>
+
+                                {request.blockchainTransaction && (
+                                    <div className="w-full mt-4 pt-4 border-t border-blue-100/50 relative z-10">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg">
+                                                <span className="text-xl">⛓️</span>
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <h5 className="text-indigo-950 font-bold text-sm uppercase tracking-wider">Blockchain Evidence</h5>
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${request.blockchainTransaction.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                        {request.blockchainTransaction.status}
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-4 mt-1">
+                                                    <div className="text-[10px] font-mono text-indigo-700 bg-white/50 px-2 py-1 rounded-md border border-indigo-50">
+                                                        TX: {request.blockchainTransaction.transactionHash.substring(0, 32)}...
+                                                    </div>
+                                                    {request.blockchainTransaction.blockNumber && (
+                                                        <div className="text-[10px] font-mono text-indigo-700 bg-white/50 px-2 py-1 rounded-md border border-indigo-50">
+                                                            BLOCK: #{request.blockchainTransaction.blockNumber}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <a
+                                                href={`https://sepolia.etherscan.io/tx/${request.blockchainTransaction.transactionHash}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg text-[10px] font-black hover:bg-indigo-100 transition-all border border-indigo-100"
+                                            >
+                                                EXPLORER ↗
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                     <div className="grid lg:grid-cols-12 gap-8">
                         {/* Student Details Section */}
                         <div className="lg:col-span-4 space-y-6">
@@ -141,9 +336,39 @@ const RequestDetailsModal = ({ request, onClose, onApprove, onReject }) => {
                                         </span>
                                     </div>
                                     {ipfsHash && (
-                                        <div className="mt-3 p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col gap-1">
-                                            <span className="text-[10px] font-bold text-blue-600 uppercase">IPFS CONTENT HASH</span>
-                                            <span className="text-[9px] font-mono break-all text-blue-800">{ipfsHash}</span>
+                                        <div className="mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100 shadow-sm transition-all hover:shadow-md">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">IPFS CONTENT HASH</span>
+                                                    <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
+                                                </div>
+                                                <a
+                                                    href={`${ipfsProvider}${ipfsHash}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white bg-blue-600 px-3 py-1.5 rounded-full hover:bg-blue-700 transition-all hover:-translate-y-0.5 shadow-md active:scale-95"
+                                                >
+                                                    View on IPFS ↗
+                                                </a>
+                                            </div>
+                                            <div className="relative group">
+                                                <div className="text-[10px] font-mono break-all text-blue-900 bg-white/80 p-3 rounded-xl border border-blue-100/50 group-hover:border-blue-300 transition-colors">
+                                                    {ipfsHash}
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(ipfsHash);
+                                                        alert("Hash copied to clipboard!");
+                                                    }}
+                                                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-white shadow-sm hover:bg-gray-50 transition-all text-blue-600"
+                                                    title="Copy Hash"
+                                                >
+                                                    📋
+                                                </button>
+                                            </div>
+                                            <p className="mt-2 text-[9px] text-blue-600/70 italic font-medium leading-tight">
+                                                Secured via InterPlanetary File System. Decentralized and immutable.
+                                            </p>
                                         </div>
                                     )}
                                     {request.remarks && (
@@ -171,20 +396,20 @@ const RequestDetailsModal = ({ request, onClose, onApprove, onReject }) => {
                                 </div>
 
                                 {/* Actual Image Display */}
-                                <div className="flex-1 overflow-auto bg-gray-800 flex items-center justify-center p-4">
+                                <div className="flex-1 overflow-auto bg-gray-800 flex items-center justify-center p-3">
                                     {currentDocumentBase64 ? (
                                         <div className="w-full h-full flex flex-col items-center">
                                             {/* Preview of the document */}
-                                            <div className="relative w-full h-[500px] border-4 border-emerald-500/30 rounded-lg overflow-hidden flex items-center justify-center bg-white shadow-2xl">
+                                            <div className="relative w-full h-[600px] border-4 border-emerald-500/30 rounded-lg overflow-hidden flex items-center justify-center bg-white shadow-2xl">
                                                 <iframe
-                                                    src={`data:application/pdf;base64,${currentDocumentBase64}#toolbar=0&navpanes=0&scrollbar=0`}
+                                                    src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                                                     className="w-full h-full border-none"
                                                     title="Degree Stamped Preview"
                                                 />
                                                 <div className="absolute top-0 left-0 w-full h-full pointer-events-none border-4 border-white/10"></div>
                                             </div>
 
-                                            <div className="mt-4 flex gap-4">
+                                            <div className="mt-3 flex gap-4">
                                                 <button
                                                     onClick={handleOpenFull}
                                                     className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition shadow-lg"
@@ -209,11 +434,27 @@ const RequestDetailsModal = ({ request, onClose, onApprove, onReject }) => {
                                 </div>
 
                                 {/* Document Footer Info */}
-                                <div className="bg-emerald-900 text-emerald-100 px-6 py-3 flex justify-between items-center text-[10px] font-mono tracking-wider">
-                                    <span>STAMP: {isStamped ? "HEC STAMPED" : "PENDING STAMP"}</span>
+                                <div className="bg-emerald-900 text-emerald-100 px-6 py-2 flex flex-wrap justify-between items-center text-[10px] font-mono tracking-wider gap-4">
+                                    <div className="flex items-center gap-6">
+                                        <span className="flex items-center gap-2">
+                                            <span className="text-emerald-500/50">STATUS:</span>
+                                            <span className="font-bold">{documentStatus.replace(/_/g, ' ')}</span>
+                                        </span>
+                                        {ipfsHash && (
+                                            <a
+                                                href={`${ipfsProvider}${ipfsHash}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-300 hover:text-blue-200 underline decoration-blue-500/50 underline-offset-4 flex items-center gap-1.5"
+                                            >
+                                                <span className="text-emerald-500/50">IPFS:</span>
+                                                {ipfsHash.substring(0, 16)}... ↗
+                                            </a>
+                                        )}
+                                    </div>
                                     <span className="flex items-center gap-2">
-                                        <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                                        BLOCKCHAIN VERIFIED
+                                        <span className={`w-2.5 h-2.5 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)] ${documentStatus === 'BLOCKCHAIN_ANCHORED' ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+                                        {documentStatus === 'BLOCKCHAIN_ANCHORED' ? 'BLOCKCHAIN SECURED' : 'VERIFICATION ACTIVE'}
                                     </span>
                                 </div>
                             </div>
@@ -228,30 +469,89 @@ const RequestDetailsModal = ({ request, onClose, onApprove, onReject }) => {
                             <div className="flex flex-wrap items-center justify-center gap-3">
                                 <button
                                     onClick={handleStamp}
-                                    disabled={isStamping}
-                                    className="flex-1 min-w-[150px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group disabled:opacity-50"
+                                    disabled={isStamping || currentStatusOrder >= 1}
+                                    className="flex-1 min-w-[150px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-white disabled:hover:text-emerald-600"
                                 >
                                     {isStamping ? <FiLoader className="animate-spin" /> : <span>🏷️</span>}
-                                    {isStamping ? "STAMPING..." : "STAMP DOCUMENT"}
+                                    {currentStatusOrder >= 1 ? "ALREADY STAMPED" : isStamping ? "STAMPING..." : "STAMP DOCUMENT"}
                                 </button>
                                 <button
                                     onClick={handleIpfsUpload}
-                                    disabled={isUploading || !!ipfsHash}
-                                    className="flex-1 min-w-[150px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group disabled:opacity-50"
+                                    disabled={isUploading || currentStatusOrder >= 2}
+                                    className="flex-1 min-w-[150px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-white disabled:hover:text-emerald-600"
                                 >
                                     {isUploading ? <FiLoader className="animate-spin" /> : <span>☁️</span>}
-                                    {ipfsHash ? "UPLOADED TO IPFS" : isUploading ? "UPLOADING..." : "UPLOAD TO IPFS"}
+                                    {currentStatusOrder >= 2 ? "UPLOADED TO IPFS" : isUploading ? "UPLOADING..." : "UPLOAD TO IPFS"}
                                 </button>
-                                <button className="flex-1 min-w-[150px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group">
-                                    <span className="text-xl group-hover:rotate-12 transition-transform">📄</span>
-                                    SMART CONTRACT
+                                <button
+                                    onClick={handleQrStamp}
+                                    disabled={isQrStamping || currentStatusOrder >= 3}
+                                    className="flex-1 min-w-[150px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-white disabled:hover:text-emerald-600"
+                                >
+                                    {isQrStamping ? <FiLoader className="animate-spin" /> : <span className="text-xl group-hover:rotate-12 transition-transform">📄</span>}
+                                    {currentStatusOrder >= 3 ? "QR PRINTED" : isQrStamping ? "PRINTING..." : "PRINT QR CODE"}
                                 </button>
-                                <button className="flex-1 min-w-[200px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group">
-                                    <span className="text-xl group-hover:rotate-12 transition-transform">⛓️</span>
-                                    IPFS HASH TRANSACTION
+                                <button
+                                    onClick={handleStoreResult}
+                                    disabled={isAnchoring || currentStatusOrder >= 4}
+                                    className="flex-1 min-w-[200px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-white text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100 transition-all hover:-translate-y-1 active:scale-95 group disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-white disabled:hover:text-emerald-600"
+                                >
+                                    {isAnchoring ? <FiLoader className="animate-spin" /> : <span className="text-xl group-hover:rotate-12 transition-transform">⛓️</span>}
+                                    {currentStatusOrder >= 4 ? "BLOCKCHAIN ANCHORED" : isAnchoring ? "ANCHORING..." : "ANCHOR TO BLOCKCHAIN"}
                                 </button>
                             </div>
                         </div>
+
+                        {request.blockchainTransaction && (
+                            <div className="bg-indigo-50/50 border-2 border-indigo-100 rounded-3xl p-6 shadow-sm">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
+                                            <FiShield size={20} />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-indigo-950 font-bold text-sm tracking-tight uppercase">Blockchain Transaction Receipt</h4>
+                                            <p className="text-indigo-600/70 text-[10px] font-bold">ETHEREUM NETWORK (SEPOLIA)</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${request.blockchainTransaction.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                            {request.blockchainTransaction.status}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <span className="text-[10px] font-bold text-indigo-300 uppercase">Transaction Hash</span>
+                                        <div className="flex items-center gap-2">
+                                            <code className="text-[10px] bg-white border border-indigo-100 px-2 py-1.5 rounded-lg text-indigo-900 break-all flex-1">
+                                                {request.blockchainTransaction.transactionHash}
+                                            </code>
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(request.blockchainTransaction.transactionHash);
+                                                    alert("Tx Hash copied!");
+                                                }}
+                                                className="p-1.5 hover:bg-white rounded-lg transition-colors text-indigo-400"
+                                            >
+                                                📋
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-end justify-start md:justify-end gap-3">
+                                        <a
+                                            href={`https://sepolia.etherscan.io/tx/${request.blockchainTransaction.transactionHash}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-6 py-2.5 bg-indigo-600 text-white text-[10px] font-black rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95 flex items-center gap-2"
+                                        >
+                                            VERIFY ON ETHERSCAN ↗
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex justify-center items-center gap-4 py-6 mt-4">
                             {request.status === "VERIFIED_BY_UNIVERSITY" ? (
